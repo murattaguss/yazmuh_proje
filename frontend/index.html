@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Şifa Polikliniği</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=2.9">
+</head>
+
+<body>
+    <div id="login-screen" class="login-wrapper">
+        <div class="falling-leaves-container">
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+        </div>
+
+        <div class="login-container">
+            <div class="wellness-card">
+                <div class="organic-border"></div>
+
+                <div class="mindful-header">
+                    <div class="zen-logo">
+                        <img src="/static/logo.png" alt="Şifa Polikliniği Logo">
+                    </div>
+                    <h2>Şifa Polikliniği</h2>
+                </div>
+
+                <form id="form-login">
+                    <div class="organic-field">
+                        <input type="text" id="login-username" placeholder=" " required>
+                        <label for="login-username">Kullanıcı Adı</label>
+                        <div class="field-nature"></div>
+                    </div>
+
+                    <div class="organic-field">
+                        <input type="password" id="login-password" placeholder=" " required>
+                        <label for="login-password">Şifre</label>
+                        <div class="field-nature"></div>
+                    </div>
+
+                    <button type="submit" class="harmony-button">
+                        <div class="button-earth"></div>
+                        <span class="button-text">Giriş</span>
+                    </button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+    <div class="app-container hidden" id="main-dashboard">
+
+        <main class="main-content">
+            <header class="top-header">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img src="/static/logo.png" alt="Logo" style="width: 35px; height: 35px; object-fit: contain;">
+                    <h2 style="color: var(--primary-medical); margin: 0; font-size: 1.4rem;">Şifa Polikliniği</h2>
+                </div>
+                <div style="display: flex; align-items: center; gap: 20px; margin-left: auto;">
+                    <h1 id="page-title" style="margin: 0; color: var(--text-muted); font-size: 1.1rem; font-weight: 500;">Hoşgeldiniz</h1>
+                    <button id="btn-logout" class="btn btn-secondary">Çıkış Yap</button>
+                </div>
+            </header>
+
+            <div class="view-container">
+                <section id="registration-view" class="view active">
+                    <div style="display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 130px);">
+                        <div class="card" style="width: 100%; max-width: 800px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                            <h3 style="text-align: center; margin-bottom: 25px;">Hasta Kayıt Formu</h3>
+                            <form id="form-patient">
+                                <div class="form-row">
+                                    <div class="form-group" style="flex: 1;">
+                                        <label>T.C. Kimlik No</label>
+                                        <input type="text" id="pat-tc" maxlength="11" required>
+                                    </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        <label>Telefon</label>
+                                        <input type="tel" id="pat-phone" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group"><label>Ad</label><input type="text" id="pat-first" required></div>
+                                    <div class="form-group"><label>Soyad</label><input type="text" id="pat-last" required></div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Doğum Tarihi</label>
+                                        <input type="date" id="pat-birth" required class="modern-date">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Cinsiyet</label>
+                                        <select id="pat-gender" required>
+                                            <option value="" selected disabled>Seçiniz</option>
+                                            <option value="Erkek">Erkek</option>
+                                            <option value="Kadın">Kadın</option>
+                                            <option value="Diğer">Diğer</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Kan Grubu</label>
+                                        <select id="pat-blood" required>
+                                            <option value="" selected disabled>Seçiniz</option>
+                                            <option value="A+">A (+)</option>
+                                            <option value="A-">A (-)</option>
+                                            <option value="B+">B (+)</option>
+                                            <option value="B-">B (-)</option>
+                                            <option value="AB+">AB (+)</option>
+                                            <option value="AB-">AB (-)</option>
+                                            <option value="0+">0 (+)</option>
+                                            <option value="0-">0 (-)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Boy (cm)</label>
+                                        <input type="number" id="pat-height" step="1" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Kilo (kg)</label>
+                                        <input type="number" id="pat-weight" step="0.1" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px; height: 45px; font-size: 1.1rem;">Kaydet</button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+                <section id="appointment-view" class="view">
+                    <div style="display: flex; flex-direction: column; gap: 30px; justify-content: center; align-items: center; min-height: calc(100vh - 130px); padding: 40px 0;">
+                        <div class="card" style="width: 100%; max-width: 800px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                            <h3 style="text-align: center; margin-bottom: 25px;">Randevu Al</h3>
+                            <form id="form-appointment">
+                                <div class="form-group"><label>Hasta TC Kimlik No</label><input type="text"
+                                        id="app-pat-tc" maxlength="11" required></div>
+                                <div class="form-group"><label>Doktor Seçin</label><select id="app-doc-id" required>
+                                        <option value="" disabled selected>Doktor Yükleniyor...</option>
+                                    </select></div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex: 1;"><label>Tarih</label><input type="date" id="app-date"
+                                            required class="modern-date"></div>
+                                    <div class="form-group" style="flex: 1;"><label>Saat</label><input type="time" id="app-time"
+                                            required min="09:00" max="16:30"></div>
+                                </div>
+                                <div style="display: flex; gap: 15px; margin-top: 15px;">
+                                    <button type="submit" class="btn btn-primary" style="flex: 1; height: 45px; font-size: 1.1rem;">Randevu Oluştur</button>
+                                    <button type="button" id="btn-check-avail" class="btn btn-secondary" style="flex: 1; height: 45px; font-size: 1.1rem; margin-left: 0;">Boş Saatleri Sor</button>
+                                </div>
+                            </form>
+                            <div id="avail-result" class="alert info hidden"></div>
+                            <div id="alt-times-panel" class="alt-times-container hidden"></div>
+                        </div>
+                        <div class="card" style="width: 100%; max-width: 800px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                            <h3 style="text-align: center; margin-bottom: 25px;">Randevu İptal / Erteleme</h3>
+                            <form id="form-search-appt">
+                                <div class="form-group">
+                                    <label>Hasta TC Kimlik No</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="text" id="search-appt-tc" maxlength="11" required>
+                                        <button type="submit" class="btn btn-secondary"
+                                            style="margin-left: 0;">Ara</button>
+                                    </div>
+                                </div>
+                            </form>
+                            <div id="appt-search-result" class="hidden">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Doktor</th>
+                                            <th>Tarih</th>
+                                            <th>Saat</th>
+                                            <th>Durum</th>
+                                            <th>İşlem</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="appt-search-tbody"></tbody>
+                                </table>
+                                <div id="reschedule-panel" class="hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section id="doctor-view" class="view">
+                    <div class="admin-layout">
+                        <aside class="admin-sidebar">
+                            <div id="doctor-welcome-name" style="padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.1); margin-bottom: 10px; color: var(--primary-medical); font-size: 1.1rem; font-weight: 600;">
+                                Hoş Geldiniz, Doktor
+                            </div>
+                            <button class="admin-menu-btn active" onclick="switchDocTab('tab-doc-daily')">Günlük Randevular</button>
+                            <button class="admin-menu-btn" onclick="switchDocTab('tab-doc-query')">Hasta Sorgulama</button>
+                            <button class="admin-menu-btn" onclick="switchDocTab('tab-doc-exam')">Muayene Kaydı</button>
+                            <button class="admin-menu-btn" onclick="switchDocTab('tab-doc-report')">Rapor / Reçete</button>
+                        </aside>
+                        
+                        <main class="admin-content-area">
+                            <div id="tab-doc-daily" class="card admin-tab-content active">
+                                <h3>Günlük Randevu Listesi</h3>
+                                <div class="daily-header">
+                                    <div class="form-group">
+                                        <label>Tarih</label>
+                                        <input type="date" id="doc-daily-date">
+                                    </div>
+                                    <button type="button" id="btn-load-daily" class="btn btn-primary">Yükle</button>
+                                </div>
+                                <div id="daily-stats" class="daily-stats hidden"></div>
+                                <div id="daily-appointments-container">
+                                    <div class="empty-state">
+                                        <span>📋</span>
+                                        <p>Randevuları görmek için tarih seçip "Yükle" butonuna basın.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-doc-query" class="card admin-tab-content">
+                                <h3>Hasta Bilgisi Sorgulama</h3>
+                                <form id="form-query-patient">
+                                    <div class="form-group">
+                                        <label>Hasta TC Kimlik No</label>
+                                        <div style="display: flex; gap: 10px;">
+                                            <input type="text" id="query-pat-tc" maxlength="11" required>
+                                            <button type="submit" class="btn btn-secondary"
+                                                style="margin-left: 0;">Sorgula</button>
+                                        </div>
+                                    </div>
+                                </form>
+                                <div id="patient-info-result" class="hidden"
+                                    style="margin-top: 15px; padding: 15px; background: #f0f4f8; border-radius: 6px; border: 1px solid var(--border-color);">
+                                </div>
+                            </div>
+                            <div id="tab-doc-exam" class="card admin-tab-content">
+                                <h3>Muayene Kaydı Ekle</h3>
+                                <form id="form-examination">
+                                    <div class="form-group"><label>Hasta TC Kimlik No</label><input type="text"
+                                            id="exam-pat-tc" maxlength="11" required></div>
+                                    <div class="form-group"><label>Tanı</label><textarea id="exam-diag" rows="2"></textarea>
+                                    </div>
+                                    <div class="form-group"><label>Tedavi</label><textarea id="exam-treat"
+                                            rows="2"></textarea></div>
+                                    <div class="form-group"><label>Reçete</label><textarea id="exam-presc"
+                                            rows="2"></textarea></div>
+                                    <div class="form-checkbox"><input type="checkbox" id="exam-refer"><label
+                                            for="exam-refer">Başka kuruma sevk edilsin mi?</label></div>
+                                    <button type="submit" class="btn btn-primary">Muayeneyi Tamamla</button>
+                                </form>
+                            </div>
+                            <div id="tab-doc-report" class="card admin-tab-content">
+                                <h3>Rapor / Reçete Görüntüle</h3>
+                                <form id="form-report">
+                                    <div class="form-group"><label>Hasta TC Kimlik No</label><input type="text"
+                                            id="report-pat-tc" maxlength="11" required></div>
+                                    <button type="submit" class="btn btn-primary">Rapor Görüntüle</button>
+                                    <button type="button" id="btn-referral" class="btn btn-secondary">Sevk Belgesi</button>
+                                </form>
+                            </div>
+                        </main>
+                    </div>
+                </section>
+                <section id="cashier-view" class="view">
+                    <div style="display: flex; flex-direction: column; gap: 30px; justify-content: center; align-items: center; min-height: calc(100vh - 130px); padding: 40px 0;">
+                        <div class="card" style="width: 100%; max-width: 800px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                            <h3 style="text-align: center; margin-bottom: 25px;">Fatura Hesapla</h3>
+                            <form id="form-calc-bill">
+                                <div class="form-group"><label>Hasta TC Kimlik No</label><input type="text" id="bill-pat-tc"
+                                        maxlength="11" required></div>
+                                <button type="submit" class="btn btn-primary" style="width: 100%; height: 45px; font-size: 1.1rem;">Hesapla</button>
+                            </form>
+                            <div id="bill-result" class="bill-receipt hidden">
+                                <p><strong>TC:</strong> <span id="res-tc"></span></p>
+                                <p><strong>Sigorta Tipi:</strong> <span id="res-ins-type"></span></p>
+                                <p><strong>Ham Tutar:</strong> <span id="res-base"></span> TL</p>
+                                <p><strong>Sigorta İndirimi:</strong> %<span id="res-disc-perc"></span> (<span
+                                        id="res-disc-amt"></span> TL)</p>
+                                <hr>
+                                <h4>Ödenecek Net Tutar: <span id="res-final" class="text-primary"></span> TL</h4>
+                            </div>
+                        </div>
+                        <div class="card" style="width: 100%; max-width: 800px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                            <h3 style="text-align: center; margin-bottom: 25px;">Ödeme Al</h3>
+                            <form id="form-payment">
+                                <div class="form-group"><label>Hasta TC Kimlik No</label><input type="text" id="pay-pat-tc"
+                                        maxlength="11" required></div>
+                                <div class="form-group"><label>Ödeme Yöntemi</label><select id="pay-method" required>
+                                        <option value="Nakit">Nakit</option>
+                                        <option value="Kredi Kartı">Kredi Kartı</option>
+                                    </select></div>
+                                <button type="submit" class="btn btn-primary" style="width: 100%; height: 45px; font-size: 1.1rem;">Ödemeyi Tamamla</button>
+                            </form>
+                        </div>
+                        <div class="card" style="width: 100%; max-width: 800px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                            <h3 style="text-align: center; margin-bottom: 25px;">İşlem Sorgulama</h3>
+                            <form id="form-transactions"
+                                style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1;"><label>Hasta TC</label><input type="text"
+                                        id="txn-tc" maxlength="11"></div>
+                                <div class="form-group" style="flex: 1;"><label>Durum</label><select id="txn-status">
+                                        <option value="">Tümü</option>
+                                        <option value="Bekliyor">Bekliyor</option>
+                                        <option value="Ödendi">Ödendi</option>
+                                    </select></div>
+                                <button type="submit" class="btn btn-primary"
+                                    style="height: 45px; font-size: 1.1rem; padding: 0 30px;">Sorgula</button>
+                            </form>
+                            <div id="txn-result" class="hidden">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Hasta</th>
+                                            <th>TC</th>
+                                            <th>Tarih</th>
+                                            <th>Tutar</th>
+                                            <th>İndirim</th>
+                                            <th>Net</th>
+                                            <th>Yöntem</th>
+                                            <th>Durum</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="txn-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section id="admin-view" class="view">
+                    <div class="admin-layout">
+                        <aside class="admin-sidebar">
+                            <button class="admin-menu-btn active" onclick="switchAdminTab('tab-clinic')">Klinik Ekle</button>
+                            <button class="admin-menu-btn" onclick="switchAdminTab('tab-doctor')">Doktor Ekle</button>
+                            <button class="admin-menu-btn" onclick="switchAdminTab('tab-user-list')">Kullanıcı Listesi</button>
+                            <button class="admin-menu-btn" onclick="switchAdminTab('tab-clinic-list')">Klinik Listesi</button>
+                            <button class="admin-menu-btn" onclick="switchAdminTab('tab-doctor-list')">Doktor Listesi</button>
+                        </aside>
+                        
+                        <main class="admin-content-area">
+                            <div id="tab-clinic" class="card admin-tab-content active">
+                                <h3>Klinik Ekle</h3>
+                                <form id="form-clinic">
+                                    <div class="form-group"><label>Klinik Adı</label><input type="text" id="clinic-name" required></div>
+                                    <button type="submit" class="btn btn-primary">Klinik Ekle</button>
+                                </form>
+                            </div>
+                            
+                            <div id="tab-doctor" class="card admin-tab-content">
+                                <h3>Doktor Ekle</h3>
+                                <form id="form-doctor">
+                                    <div class="form-group"><label>Klinik</label><select id="doc-clinic-id" required>
+                                        <option value="" disabled selected>Klinik Yükleniyor...</option>
+                                    </select></div>
+                                    <div class="form-row">
+                                        <div class="form-group"><label>Ad</label><input type="text" id="doc-first" required></div>
+                                        <div class="form-group"><label>Soyad</label><input type="text" id="doc-last" required></div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group"><label>T.C.</label><input type="text" id="doc-tc" maxlength="11" minlength="11" required></div>
+                                        <div class="form-group"><label>Doğum Tarihi</label><input type="date" id="doc-birth" required></div>
+                                        <div class="form-group"><label>Telefon</label><input type="tel" id="doc-phone" required></div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Doktor Ekle</button>
+                                </form>
+                            </div>
+                            
+
+                            <div id="tab-user-list" class="card admin-tab-content">
+                                <h3>Kullanıcı Listesi</h3>
+                                <button type="button" id="btn-load-users" class="btn btn-secondary" style="margin-left: 0; margin-bottom: 10px;">Yenile</button>
+                                <div id="users-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Kullanıcı Adı</th>
+                                                <th>Rol</th>
+                                                <th>Bağlı Doktor</th>
+                                                <th>İşlem</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="users-tbody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div id="tab-clinic-list" class="card admin-tab-content">
+                                <h3>Klinik Listesi</h3>
+                                <button type="button" id="btn-load-clinics" class="btn btn-secondary" style="margin-left: 0; margin-bottom: 10px;">Yenile</button>
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Klinik Adı</th>
+                                            <th>Durum</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="clinics-tbody"></tbody>
+                                </table>
+                            </div>
+
+                            <div id="tab-doctor-list" class="card admin-tab-content">
+                                <h3>Doktor Listesi</h3>
+                                <button type="button" id="btn-load-doctors-admin" class="btn btn-secondary" style="margin-left: 0; margin-bottom: 10px;">Yenile</button>
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>T.C.</th>
+                                            <th>Ad Soyad</th>
+                                            <th>Klinik</th>
+                                            <th>Telefon</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="doctors-tbody"></tbody>
+                                </table>
+                            </div>
+                        </main>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Rapor</h3>
+                <button class="modal-close" id="modal-close-btn">✕</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="modal-print-btn">Yazdır</button>
+                <button class="btn btn-secondary" id="modal-close-btn2" style="margin-left: 0;">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/static/app.js?v=3.0"></script>
+</body>
+
+</html>
