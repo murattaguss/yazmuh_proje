@@ -12,7 +12,7 @@ from sqlalchemy.future import select
 from app import models
 from app.database import get_db
 
-# Gizli anahtar (aslında .env'de olmalı)
+# Gizli anahtar
 SECRET_KEY = "super_secret_key_sifa_poliklinik"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # Token süresi (1 gün)

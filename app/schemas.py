@@ -27,6 +27,13 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class UserCreate(BaseModel):
+    """Yeni kullanıcı oluşturma şeması"""
+    username: str
+    password: str
+    role: UserRole
+    doctor_id: Optional[int] = None
+
 # Klinik Şemaları
 class ClinicBase(BaseModel):
     """Klinik genel bilgileri"""
