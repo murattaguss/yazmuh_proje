@@ -20,7 +20,7 @@ def get_next_weekday(start_date=None):
 class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         # 1. SQLite kontrolü
-        # SQLite varsa hafızada (in-memory) çalıştır, yoksa Postgres kullanıp geri al (rollback)
+        # SQLite varsa hafızada çalıştır, yoksa Postgres kullanıp geri al
         self.use_sqlite = True
         try:
             import aiosqlite
@@ -79,12 +79,12 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
             await self.session.commit()
 
     async def asyncTearDown(self):
-        # Test bitince veritabanını temizle (rollback yap)
+        # Test bitince veritabanını temizle
         await self.transaction.rollback()
         await self.connection.close()
         await self.engine.dispose()
 
-    # --- TEST 1: Hasta Kaydetme Testi (Öğrenci 1) ---
+    # TEST 1: Hasta kaydetme testi
     async def test_create_patient(self):
         patient_data = schemas.PatientCreate(
             tc_no="12345678999",
@@ -109,7 +109,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("zaten var", context.exception.detail)
 
-    # --- TEST 2: Randevu Alma Testi (Öğrenci 2) ---
+    # TEST 2: Randevu alma testi
     async def test_create_appointment_success(self):
         # Önce hasta ekle
         patient = models.Patient(
@@ -134,7 +134,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db_appt.patient_id, patient.id)
         self.assertEqual(db_appt.status, models.AppointmentStatus.AKTIF)
 
-    # --- TEST 3: Randevu Çakışması Testi (Öğrenci 2) ---
+    # TEST 3: Randevu çakışması testi
     async def test_create_appointment_conflict(self):
         # Hastaları ekle
         p1 = models.Patient(tc_no="11111111112", first_name="Ali", last_name="Can", birth_date=datetime.date(1990, 1, 1))
@@ -162,13 +162,13 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("alternative_dates", detail) # Alternatif tarihler var mı diye bak
         self.assertTrue(len(detail["alternative_dates"]) > 0)
 
-    # --- TEST 4: Yanlış Saatte Randevu Alma Testi (Öğrenci 3) ---
+    # TEST 4: Çalışma saatleri dışı randevu testi
     async def test_create_appointment_invalid_time(self):
         p = models.Patient(tc_no="11111111114", first_name="Aysu", last_name="Gül", birth_date=datetime.date(1992, 1, 1))
         self.session.add(p)
         await self.session.commit()
         
-        # Çalışma saati dışı (gece 23:00)
+        # Çalışma saati dışı (23:00)
         appt_data = schemas.AppointmentCreate(
             patient_tc=p.tc_no,
             clinic_id=1,
@@ -182,7 +182,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("09:00 ile 16:30 arasında", context.exception.detail)
 
-    # --- TEST 5: Doktorun Randevu Listesi Testi (Öğrenci 3) ---
+    # TEST 5: Doktorun randevu listesi testi
     async def test_get_my_appointments(self):
         p = models.Patient(tc_no="11111111115", first_name="Cem", last_name="Mert", birth_date=datetime.date(1993, 1, 1))
         self.session.add(p)
@@ -203,8 +203,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(res.appointments), 1)
         self.assertEqual(res.appointments[0].patient_tc, p.tc_no)
 
-    # --- TEST 6: Muayene ve Rapor Testi (Öğrenci 4) ---
-    # Rapor alanının kaydedildiğini kontrol eder
+    # TEST 6: Muayene ve rapor kaydetme testi
     async def test_create_examination_and_save_report(self):
         p = models.Patient(tc_no="11111111116", first_name="Ebru", last_name="Şen", birth_date=datetime.date(1994, 1, 1))
         self.session.add(p)
@@ -228,7 +227,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(db_exam.id)
         self.assertEqual(db_exam.medical_report, "3 Gün İstirahat Uygundur.") # Başarıyla kaydedildi mi bak
 
-    # --- TEST 7: Hasta Geçmişi Sorgulama Testi (Öğrenci 4) ---
+    # TEST 7: Hasta geçmişi sorgulama testi
     async def test_get_patient_history(self):
         p = models.Patient(tc_no="11111111117", first_name="Fatih", last_name="Kaya", birth_date=datetime.date(1995, 1, 1))
         self.session.add(p)
@@ -247,8 +246,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(history.examinations), 1)
         self.assertEqual(history.examinations[0].diagnosis, "Göz Nezlesi")
 
-    # --- TEST 8: Sigorta ve Fatura Hesaplama Testi (Öğrenci 5) ---
-    # Fatura şeması hatasını denetler
+    # TEST 8: Sigorta ve fatura hesaplama testi
     async def test_calculate_billing_insurance_discount(self):
         # 65 yaş üstü emekli hasta (%90 indirimli)
         p = models.Patient(tc_no="11111111118", first_name="Kemal", last_name="Dede", birth_date=datetime.date(1950, 1, 1))
@@ -272,8 +270,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bill.discount_amount, 900.0)
         self.assertEqual(bill.final_amount, 100.0) # 1000 - 900 = 100 TL
 
-    # --- TEST 9: Ödeme Alma Testi (Öğrenci 5) ---
-    # Ödeme alma hatasını denetler
+    # TEST 9: Ödeme alma testi
     async def test_process_payment_success(self):
         p = models.Patient(tc_no="11111111119", first_name="Lale", last_name="Sol", birth_date=datetime.date(1988, 1, 1))
         self.session.add(p)
@@ -300,7 +297,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db_payment.payment_status, models.PaymentStatus.ODENDI)
         self.assertEqual(db_payment.payment_method, models.PaymentMethod.KREDI_KARTI)
 
-    # --- TEST 10: Giriş ve Şifre Testi ---
+    # TEST 10: Kullanıcı giriş ve şifre doğrulama testi
     async def test_user_login(self):
         # Şifre kontrolü
         plain_password = "kayit123"
@@ -309,7 +306,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(auth.verify_password(plain_password, hashed))
         self.assertFalse(auth.verify_password("yanlis_sifre", hashed))
 
-    # --- TEST 11: Klinik Ekleme Testi (Öğrenci 6) ---
+    # TEST 11: Klinik ekleme testi
     async def test_create_clinic(self):
         # Yeni bir klinik ekle
         clinic_data = schemas.ClinicCreate(name="Kardiyoloji")
@@ -320,7 +317,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db_clinic.name, "Kardiyoloji")
         self.assertTrue(db_clinic.is_active)
 
-    # --- TEST 12: Doktor Ekleme Testi (Öğrenci 7) ---
+    # TEST 12: Doktor ekleme testi
     async def test_create_doctor(self):
         # Yeni doktor bilgileri
         doc_data = schemas.DoctorCreate(
@@ -348,6 +345,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(user.role, models.UserRole.DOCTOR)
         self.assertEqual(user.doctor_id, db_doctor.id)
 
+    # TEST 13: Doktor ekleme doğrulama hataları testi
     async def test_create_doctor_validation_errors(self):
         from pydantic import ValidationError
         
@@ -395,7 +393,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
                 clinic_id=1
             )
 
-    # --- TEST 13: Randevu İptal Testi (Öğrenci 8) ---
+    # TEST 14: Randevu iptal testi
     async def test_cancel_appointment(self):
         # Önce hasta ve randevu oluştur
         p = models.Patient(tc_no="11111111120", first_name="Oya", last_name="Başar", birth_date=datetime.date(1990, 1, 1))
@@ -422,7 +420,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("zaten iptal", context.exception.detail)
 
-    # --- TEST 14: Randevu Erteleme Testi (Öğrenci 9) ---
+    # TEST 15: Randevu erteleme testi
     async def test_reschedule_appointment(self):
         # Önce hasta ve randevu oluştur
         p = models.Patient(tc_no="11111111121", first_name="Can", last_name="Yılmaz", birth_date=datetime.date(1991, 1, 1))
@@ -454,7 +452,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(updated_appt.appointment_date, new_date)
         self.assertEqual(updated_appt.appointment_time, new_time)
 
-    # --- TEST 15: Olmayan Sevk Belgesi Hata Testi (Öğrenci 10) ---
+    # TEST 16: Olmayan sevk belgesi hata testi
     async def test_get_referral_fail(self):
         # Önce sevk edilmemiş muayene kaydı olan bir hasta oluştur
         p = models.Patient(tc_no="11111111122", first_name="Ela", last_name="Göz", birth_date=datetime.date(1995, 1, 1))
@@ -487,7 +485,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("sevk kaydı bulunmuyor", context.exception.detail)
 
-    # --- TEST 16: Hafta Sonu ve Geçmiş Saat/Tarih Randevu Engeli Testi ---
+    # TEST 17: Hafta sonu ve geçmiş zamanlı randevu engeli testi
     async def test_create_appointment_weekend_and_past_checks(self):
         # Önce hasta oluştur
         p = models.Patient(tc_no="98765432101", first_name="Deniz", last_name="Yılmaz", birth_date=datetime.date(1990, 1, 1))
@@ -550,7 +548,7 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(context.exception.status_code, 400)
                 self.assertIn("geçmiştir", context.exception.detail)
 
-    # --- TEST 17: Aynı Doktor ve Aynı Gün İçin Tek Aktif Randevu Sınırı Testi ---
+    # TEST 18: Aynı doktor ve gün için tek aktif randevu sınırı testi
     async def test_create_appointment_same_doctor_same_day_limit(self):
         # Önce hasta oluştur
         p = models.Patient(tc_no="98765432199", first_name="Berna", last_name="Çakır", birth_date=datetime.date(1990, 1, 1))
