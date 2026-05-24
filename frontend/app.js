@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('admin-view').classList.add('active');
             title = 'Yönetici Paneli';
             loadDoctors(); loadClinics(); loadDoctorsAdmin();
-            if (typeof loadUsers === 'function') loadUsers();
         } else if(userRole === 'reception') {
             document.getElementById('registration-view').classList.add('active');
             title = 'Kayıt Paneli';
@@ -57,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-        // Çıkış yapma işlemi: LocalStorage'daki tokenı siler ve giriş ekranına yönlendirir.
+        // Çıkış yapınca tokenı temizler ve giriş ekranını açar
 document.getElementById('btn-logout').addEventListener('click', () => {
         localStorage.removeItem('sifa_token'); localStorage.removeItem('sifa_role');
         authToken = null; userRole = null;
@@ -68,7 +67,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 
     let toastTimer = null;
 
-        // Ekranın sağ altında başarılı veya hatalı işlemleri bildiren küçük bilgi mesajları (toast) çıkarır.
+        // Bildirim mesajları (toast) gösterir
 function showToast(message, type = 'success', duration = 3000) {
         const toast = document.getElementById('toast');
         toast.textContent = message; toast.className = `toast show ${type}`;
@@ -82,7 +81,7 @@ function showToast(message, type = 'success', duration = 3000) {
         toast.className = 'toast hidden';
     }
 
-        // Backend API ile iletişimi sağlayan ana fonksiyon. Token gönderimi ve hata yönetimini yapar.
+        // Sunucuyla haberleşen ana fonksiyon
 async function apiCall(endpoint, method = 'GET', body = null) {
         if (!authToken) { showToast("Lütfen önce giriş yapın", "error"); throw new Error("Unauthorized"); }
         const options = { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` } };
@@ -101,7 +100,7 @@ async function apiCall(endpoint, method = 'GET', body = null) {
         const map = { 'Aktif': 'active', 'İptal': 'cancelled', 'Tamamlandı': 'completed', 'Ödendi': 'paid', 'Bekliyor': 'pending' };
         return `<span class="badge badge-${map[status] || 'active'}">${status}</span>`;
     }
-    // Randevu oluşturma ekranı için doktorların listesini API'den çekerek Select (Açılır liste) içerisine doldurur.
+    // Doktor listesini çekip select kutusuna doldurur
     async function loadDoctors() {
         try {
             const doctors = await apiCall('/reception/doctors');
@@ -111,7 +110,7 @@ async function apiCall(endpoint, method = 'GET', body = null) {
             const s2 = document.getElementById('usr-doc-id'); if(s2) s2.innerHTML = html;
         } catch(e) { console.error("Doktorlar yüklenemedi", e); }
     }
-        // Sisteme ilk defa gelen bir hastanın temel demografik bilgilerini alarak kaydını oluşturur.
+        // Yeni hasta ekler
 document.getElementById('form-patient').addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
@@ -125,10 +124,10 @@ document.getElementById('form-patient').addEventListener('submit', async (e) => 
                 weight: document.getElementById('pat-weight').value ? parseFloat(document.getElementById('pat-weight').value) : null
             });
             showToast(`Hasta başarıyla kaydedildi. (ID: ${res.id})`); e.target.reset();
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
 
-        // Randevu verilirken seçilen doktorun ve günün uygun olan boş saatlerini listeler.
+        // Seçilen günde doktorun boş saatlerini gösterir
 document.getElementById('btn-check-avail').addEventListener('click', async () => {
         const docId = document.getElementById('app-doc-id').value;
         const date = document.getElementById('app-date').value;
@@ -140,10 +139,10 @@ document.getElementById('btn-check-avail').addEventListener('click', async () =>
                 resultDiv.innerHTML = `<strong>Boş Saatler:</strong> ${res.available_times.map(t => t.substring(0,5)).join(', ')}`;
                 resultDiv.className = 'alert info';
             } else { resultDiv.innerHTML = 'Seçilen günde boş saat bulunamadı.'; resultDiv.className = 'alert info'; }
-        } catch(e) { resultDiv.className = 'hidden'; }
+        } catch(e) { resultDiv.className = 'hidden'; showToast(e.message, 'error'); }
     });
 
-        // Seçilen boş saate randevu kaydını kesinleştirir ve randevu tablosuna ekler.
+        // Randevuyu oluşturur
 document.getElementById('form-appointment').addEventListener('submit', async (e) => {
         e.preventDefault();
         const payload = {
@@ -157,15 +156,29 @@ document.getElementById('form-appointment').addEventListener('submit', async (e)
             if (res._conflict) {
                 showToast(res.message, 'error');
                 const panel = document.getElementById('alt-times-panel');
-                panel.innerHTML = `<p><strong>Alternatif boş saatler:</strong></p><div class="alt-times-grid">${
-                    res.alternatives.map(t => `<button class="alt-time-btn" data-time="${t}">${t}</button>`).join('')
-                }</div>`;
+                let altHtml = '';
+                if (res.alternatives && res.alternatives.length > 0) {
+                    altHtml += `<p><strong>Alternatif boş saatler:</strong></p><div class="alt-times-grid">${
+                        res.alternatives.map(t => `<button class="alt-time-btn" data-time="${t}">${t}</button>`).join('')
+                    }</div>`;
+                }
+                if (res.alternative_dates && res.alternative_dates.length > 0) {
+                    altHtml += `<p style="margin-top: 10px;"><strong>Alternatif boş günler:</strong></p><div class="alt-dates-grid" style="display:flex; gap:8px; flex-wrap:wrap;">${
+                        res.alternative_dates.map(d => `<button class="alt-date-btn btn btn-sm btn-secondary" data-date="${d}" style="margin:0;">${d}</button>`).join('')
+                    }</div>`;
+                }
+                panel.innerHTML = altHtml;
                 panel.classList.remove('hidden');
                 panel.querySelectorAll('.alt-time-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
                         document.getElementById('app-time').value = btn.dataset.time;
-                        panel.classList.add('hidden');
-                        showToast(`Saat ${btn.dataset.time} olarak ayarlandı. Tekrar "Randevu Oluştur" basın.`, 'success');
+                        showToast(`Saat ${btn.dataset.time} olarak ayarlandı.`, 'success');
+                    });
+                });
+                panel.querySelectorAll('.alt-date-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.getElementById('app-date').value = btn.dataset.date;
+                        showToast(`Tarih ${btn.dataset.date} olarak ayarlandı.`, 'success');
                     });
                 });
                 return;
@@ -173,7 +186,7 @@ document.getElementById('form-appointment').addEventListener('submit', async (e)
             showToast(`Randevu oluşturuldu! (ID: ${res.id})`); e.target.reset();
             document.getElementById('avail-result').className = 'hidden';
             document.getElementById('alt-times-panel').classList.add('hidden');
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
     document.getElementById('form-search-appt').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -202,7 +215,7 @@ document.getElementById('form-appointment').addEventListener('submit', async (e)
             await apiCall(`/reception/appointments/${id}/cancel`, 'PUT');
             showToast('Randevu iptal edildi. Slot serbest bırakıldı.');
             document.getElementById('form-search-appt').dispatchEvent(new Event('submit'));
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     };
 
     window.showReschedule = function(id) {
@@ -222,13 +235,20 @@ document.getElementById('form-appointment').addEventListener('submit', async (e)
         if(!nd || !nt) { showToast('Tarih ve saat seçin.', 'error'); return; }
         try {
             const res = await apiCall(`/reception/appointments/${id}/reschedule`, 'PUT', { new_date: nd, new_time: nt + ':00' });
-            if(res._conflict) { showToast(res.message + ' Alternatifler: ' + res.alternatives.join(', '), 'error'); return; }
+            if(res._conflict) { 
+                let msg = res.message + ' Alternatif Saatler: ' + res.alternatives.join(', ');
+                if (res.alternative_dates && res.alternative_dates.length > 0) {
+                    msg += ' | Alternatif Günler: ' + res.alternative_dates.join(', ');
+                }
+                showToast(msg, 'error'); 
+                return; 
+            }
             showToast('Randevu ertelendi!');
             document.getElementById('reschedule-panel').classList.add('hidden');
             document.getElementById('form-search-appt').dispatchEvent(new Event('submit'));
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     };
-    // Doktor sisteme giriş yaptığında kendi paneline düşen o günkü muayene listesini getirir.
+    // Doktorun o günkü hastalarını listeler
     async function loadMyAppointments() {
         const date = document.getElementById('doc-daily-date').value;
         if(!date) return;
@@ -289,7 +309,7 @@ document.getElementById('form-appointment').addEventListener('submit', async (e)
         } catch(e) { resultDiv.classList.add('hidden'); document.getElementById('exam-pat-tc').value = ''; }
     });
 
-        // Doktorun muayeneyi tamamlayıp teşhis ve reçete girdiği formu yönetir.
+        // Muayene ve reçete bilgilerini kaydeder
 document.getElementById('form-examination').addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
@@ -302,9 +322,9 @@ document.getElementById('form-examination').addEventListener('submit', async (e)
             });
             showToast(`Muayene kaydı tamamlandı! (Muayene ID: ${res.id})`); e.target.reset();
             loadMyAppointments();
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
-        // TC kimlik numarasına göre hastanın geçmiş e-nabız/epikriz benzeri raporunu ekranda modal içinde gösterir.
+        // Hastanın raporunu modal içinde açar
 document.getElementById('form-report').addEventListener('submit', async (e) => {
         e.preventDefault();
         const tcNo = document.getElementById('report-pat-tc').value;
@@ -321,7 +341,7 @@ document.getElementById('form-report').addEventListener('submit', async (e) => {
                 <div class="report-field"><label>Reçete</label><p>${r.prescription || 'Reçete yok'}</p></div>
                 ${r.is_referred ? '<div class="report-field"><label>Sevk</label><p>Hasta başka kuruma sevk edilmiştir.</p></div>' : ''}
             `);
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
 
     document.getElementById('btn-referral').addEventListener('click', async () => {
@@ -339,7 +359,7 @@ document.getElementById('form-report').addEventListener('submit', async (e) => {
                 <div class="report-field"><label>Tanı</label><p>${r.diagnosis || 'Belirtilmemiş'}</p></div>
                 <div class="report-field"><label>Notlar</label><p>${r.notes || '-'}</p></div>
             `);
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
     function openModal(title, bodyHtml) {
         document.getElementById('modal-title').textContent = title;
@@ -364,10 +384,10 @@ document.getElementById('form-report').addEventListener('submit', async (e) => {
             document.getElementById('res-final').textContent = res.final_amount;
             document.getElementById('bill-result').classList.remove('hidden');
             showToast('Fatura hesaplandı.');
-        } catch(e) { document.getElementById('bill-result').classList.add('hidden'); }
+        } catch(e) { document.getElementById('bill-result').classList.add('hidden'); showToast(e.message, 'error'); }
     });
 
-        // Veznedarın tahsilatını kredi kartı veya nakit olarak sisteme işlemesini sağlar.
+        // Ödemeyi alır (kart/nakit)
 document.getElementById('form-payment').addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
@@ -377,7 +397,7 @@ document.getElementById('form-payment').addEventListener('submit', async (e) => 
             });
             showToast(`Ödeme başarıyla alındı! (Yöntem: ${res.payment_method})`);
             e.target.reset(); document.getElementById('bill-result').classList.add('hidden');
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
 
     document.getElementById('form-transactions').addEventListener('submit', async (e) => {
@@ -400,38 +420,52 @@ document.getElementById('form-payment').addEventListener('submit', async (e) => 
             }
             document.getElementById('txn-result').classList.remove('hidden');
             showToast(`${txns.length} kayıt bulundu.`);
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
     document.getElementById('form-clinic').addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
             const res = await apiCall('/admin/clinics', 'POST', { name: document.getElementById('clinic-name').value });
             showToast(`Klinik eklendi! (ID: ${res.id})`); e.target.reset(); loadClinics();
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
 
-        // Yönetici panelinden yeni bir doktor ekler. Doktor eklendiğinde şifresi ekranda 30 saniye gösterilir.
+        // Doktor ekler (şifreyi 30 saniye gösterir)
 document.getElementById('form-doctor').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const tcNo = document.getElementById('doc-tc').value;
+        const phone = document.getElementById('doc-phone').value;
+
+        if (!/^\d{11}$/.test(tcNo)) {
+            showToast('T.C. Kimlik Numarası tam olarak 11 haneli ve sadece rakamlardan oluşmalıdır.', 'error');
+            return;
+        }
+
+        if (!/^\d{10}$/.test(phone)) {
+            showToast('Telefon numarası tam olarak 10 haneli (örn: 5013302285) ve sadece rakamlardan oluşmalıdır.', 'error');
+            return;
+        }
+
         try {
             const res = await apiCall('/admin/doctors', 'POST', {
                 clinic_id: parseInt(document.getElementById('doc-clinic-id').value),
                 first_name: document.getElementById('doc-first').value,
                 last_name: document.getElementById('doc-last').value,
-                tc_no: document.getElementById('doc-tc').value,
+                tc_no: tcNo,
                 birth_date: document.getElementById('doc-birth').value,
-                phone_number: document.getElementById('doc-phone').value || null
+                phone_number: phone || null
             });
             showToast(`Doktor eklendi! Kullanıcı Adı: ${res.tc_no} | Şifre: ${res.generated_password}`, 'success', 30000); 
             e.target.reset(); loadDoctors(); loadDoctorsAdmin();
-        } catch(e) {}
+        } catch(e) { showToast(e.message, 'error'); }
     });
     window.switchAdminTab = function(tabId) {
         document.querySelectorAll('.admin-tab-content').forEach(tab => tab.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         
         document.querySelectorAll('.admin-menu-btn').forEach(btn => {
-            if(btn.getAttribute('onclick').includes(tabId)) {
+            const onclickAttr = btn.getAttribute('onclick') || '';
+            if(onclickAttr.includes(`'${tabId}'`) || onclickAttr.includes(`"${tabId}"`)) {
                 btn.classList.add('active');
             } else {
                 btn.classList.remove('active');
@@ -443,7 +477,8 @@ document.getElementById('form-doctor').addEventListener('submit', async (e) => {
         document.getElementById(tabId).classList.add('active');
         
         document.querySelectorAll('#doctor-view .admin-menu-btn').forEach(btn => {
-            if(btn.getAttribute('onclick').includes(tabId)) {
+            const onclickAttr = btn.getAttribute('onclick') || '';
+            if(onclickAttr.includes(`'${tabId}'`) || onclickAttr.includes(`"${tabId}"`)) {
                 btn.classList.add('active');
             } else {
                 btn.classList.remove('active');
@@ -455,7 +490,7 @@ document.getElementById('form-doctor').addEventListener('submit', async (e) => {
         try {
             const clinics = await apiCall('/admin/clinics');
             document.getElementById('clinics-tbody').innerHTML = clinics.map(c => `<tr>
-                <td>${c.id}</td><td>${c.name}</td><td>${statusBadge(c.is_active ? 'Aktif' : 'İptal')}</td>
+                <td>${c.name}</td><td>${statusBadge(c.is_active ? 'Aktif' : 'İptal')}</td>
             </tr>`).join('');
             
             const docClinicSelect = document.getElementById('doc-clinic-id');
@@ -466,33 +501,16 @@ document.getElementById('form-doctor').addEventListener('submit', async (e) => {
         } catch(e) {}
     }
 
-    // Randevu oluşturma ekranı için doktorların listesini API'den çekerek Select (Açılır liste) içerisine doldurur.
+    // Yönetici panelindeki doktor tablosunu doldurur
     async function loadDoctorsAdmin() {
         try {
             const docs = await apiCall('/admin/doctors');
             document.getElementById('doctors-tbody').innerHTML = docs.map(d => `<tr>
-                <td>${d.id}</td><td>${d.tc_no}</td><td>${d.first_name} ${d.last_name}</td><td>${d.clinic_name}</td><td>${d.phone_number || '-'}</td>
+                <td>${d.tc_no}</td><td>${d.first_name} ${d.last_name}</td><td>${d.clinic_name}</td><td>${d.phone_number || '-'}</td>
             </tr>`).join('');
         } catch(e) {}
     }
 
-    async function loadUsers() {
-        try {
-            const users = await apiCall('/admin/users');
-            const tbody = document.getElementById('users-tbody');
-            if(tbody) {
-                tbody.innerHTML = users.map(u => `<tr>
-                    <td>${u.id}</td>
-                    <td>${u.username}</td>
-                    <td>${u.role}</td>
-                    <td>${u.doctor_id || '-'}</td>
-                    <td><span class="badge badge-active">Aktif</span></td>
-                </tr>`).join('');
-            }
-        } catch(e) {}
-    }
-
-    document.getElementById('btn-load-users').addEventListener('click', loadUsers);
     document.getElementById('btn-load-clinics').addEventListener('click', loadClinics);
     document.getElementById('btn-load-doctors-admin').addEventListener('click', loadDoctorsAdmin);
 });

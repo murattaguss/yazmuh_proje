@@ -1,28 +1,33 @@
 # Şifa Polikliniği
 
-Tıbbi klinik yönetim sistemi. Hasta kayıt, randevu ve doktor işlemleri.
+Tıbbi klinik yönetim sistemi. Hasta kayıt, randevu, doktor ve vezne işlemleri.
 
 ## Gereksinimler
 - Python 3.8+
-- PostgreSQL
+- PostgreSQL veya SQLite
 
 ## Kurulum
-1. Virtual environment oluştur: `python -m venv venv`
-2. Aktifleştir: `venv\Scripts\activate` (Windows)
-3. Bağımlılıkları yükle: `pip install -r requirements.txt`
-4. PostgreSQL veritabanı oluştur (sifa_db)
-5. `.env` dosyası oluştur:
-   ```
-   DATABASE_URL=postgresql+asyncpg://kullanici:sifre@localhost/sifa_db
+1. Sanal ortam (venv) oluştur: `python -m venv venv`
+2. Sanal ortamı aktifleştir: `venv\Scripts\activate` (Windows)
+3. Gerekli kütüphaneleri yükle: `pip install -r requirements.txt`
+4. Bir `.env` dosyası oluşturup veritabanı adresini yazın:
+   ```env
+   DATABASE_URL=sqlite+aiosqlite:///./test.db
    ```
 
 ## Çalıştırma
-```
+```bash
 uvicorn app.main:app --reload
 ```
 
-## Kullanıcılar
-- Admin: admin / admin123
-- Vezne: vezne / vezne123
-- Kayıt: kayit / kayit123
-- Rezervasyon: rezervasyon / rezervasyon123
+## Testleri Çalıştırma
+Bütün testleri çalıştırmak için şu komutu kullanın:
+```bash
+.\venv\Scripts\python.exe -m unittest tests/test_main.py
+```
+
+## Varsayılan Giriş Hesapları
+- **Admin**: admin / admin123
+- **Vezne**: vezne / vezne123
+- **Kayıt**: kayit / kayit123
+- **Rezervasyon**: rezervasyon / rezervasyon123

@@ -1,8 +1,6 @@
 """
-Veritabanı Modelleri Modülü
-Bu modül, SQLAlchemy ORM (Object-Relational Mapping) kullanarak 
-veritabanındaki tablolarımızın yapısını, alanlarını ve birbirleriyle 
-olan ilişkilerini (foreign key, relationship) tanımlar.
+Veritabanı tablolarımız.
+SQLAlchemy ile tabloları ve birbirleriyle olan ilişkileri burada tanımladık.
 """
 import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Date, Time, ForeignKey, Text, Float, Enum
@@ -10,23 +8,23 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
 
-# Randevu durumlarını takip ettiğimiz Enum.
+# Randevu durumları
 class AppointmentStatus(str, enum.Enum):
     AKTIF = "Aktif"
     IPTAL = "İptal"
     TAMAMLANDI = "Tamamlandı"
 
-# Ödeme yöntemleri (Vezne işlemleri için).
+# Ödeme yöntemleri
 class PaymentMethod(str, enum.Enum):
     NAKIT = "Nakit"
     KREDI_KARTI = "Kredi Kartı"
 
-# Fatura / Ödeme durumu.
+# Ödeme durumu
 class PaymentStatus(str, enum.Enum):
     ODENDI = "Ödendi"
     BEKLIYOR = "Bekliyor"
 
-# Kullanıcı yetki (rol) tanımlamaları. Sistemin erişim kontrolleri buna göre yapılır.
+# Kullanıcı rolleri (admin, vezne vb.)
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
     RECEPTION = "reception"
@@ -36,33 +34,32 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     """
-    Sisteme giriş yapan personellerin ve yöneticilerin hesaplarını tutar.
-    Doktorlar da buraya bağlıdır, bu sayede kendi panellerine giriş yapabilirler.
+    Sisteme giriş yapan herkesin (admin, doktor, vezne vb.) hesabı buradadır.
     """
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True, nullable=False) # TC Kimlik No veya özel bir ad olabilir
-    hashed_password = Column(String, nullable=False) # Şifreler kesinlikle hash'lenerek saklanır
-    role = Column(Enum(UserRole), nullable=False) # Kullanıcının yetki alanı
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True) # Eğer kullanıcı bir doktorsa, doktor profiliyle eşleşir
+    username = Column(String, unique=True, index=True, nullable=False) # Kullanıcı adı (TC de olabilir)
+    hashed_password = Column(String, nullable=False) # Güvenlik için şifreyi hashliyoruz
+    role = Column(Enum(UserRole), nullable=False) # Rolü
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True) # Doktorsa id'si burada yazar
 
-    # Sadece doktor profiline sahip kullanıcılar için ilişki
+    # Doktor tablosu ile ilişki
     doctor = relationship("Doctor")
 
 class Clinic(Base):
-    """Polikliniğimizde bulunan bölümleri/klinikleri (Örn: Göz, Dahiliye) temsil eder."""
+    """Klinikler (Göz, Dahiliye vs.)"""
     __tablename__ = "clinics"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
-    is_active = Column(Boolean, default=True) # İleride kliniği silmek yerine pasife alabiliriz
+    is_active = Column(Boolean, default=True) # Aktif mi pasif mi (silmek yerine pasif yapabilmek için)
 
-    # Bu klinikte çalışan tüm doktorların listesi
+    # Klinikteki doktorlar
     doctors = relationship("Doctor", back_populates="clinic")
 
 class Doctor(Base):
-    """Doktorların kişisel ve mesleki bilgilerini tutan tablomuz."""
+    """Doktorların bilgileri"""
     __tablename__ = "doctors"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -71,14 +68,14 @@ class Doctor(Base):
     tc_no = Column(String(11), unique=True, index=True, nullable=False)
     birth_date = Column(Date, nullable=False)
     phone_number = Column(String(15), unique=True, nullable=False)
-    clinic_id = Column(Integer, ForeignKey("clinics.id"), nullable=False) # Hangi kliniğe bağlı olduğu
-    session_duration = Column(Integer, default=30) # Her randevunun kaç dakika süreceği (varsayılan 30 dk)
+    clinic_id = Column(Integer, ForeignKey("clinics.id"), nullable=False) # Çalıştığı klinik id'si
+    session_duration = Column(Integer, default=30) # Randevu süresi (dk olarak, default 30)
 
     clinic = relationship("Clinic", back_populates="doctors")
     appointments = relationship("Appointment", back_populates="doctor")
 
 class Patient(Base):
-    """Hastalarımızın demografik ve tıbbi kimlik bilgilerinin tutulduğu yer."""
+    """Hastaların kişisel ve tıbbi bilgileri"""
     __tablename__ = "patients"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -91,14 +88,13 @@ class Patient(Base):
     height = Column(Float, nullable=True)
     weight = Column(Float, nullable=True)
     blood_type = Column(String(5), nullable=True)
-    created_at = Column(Date, default=datetime.date.today) # Sisteme ilk kayıt tarihi
+    created_at = Column(Date, default=datetime.date.today) # Kayıt tarihi
 
     appointments = relationship("Appointment", back_populates="patient")
 
 class Appointment(Base):
     """
-    Kayıt/Rezervasyon modülü tarafından oluşturulan randevular.
-    Hasta ve Doktor arasındaki zaman çizelgesini bağlar.
+    Randevular tablosu
     """
     __tablename__ = "appointments"
 
@@ -112,40 +108,38 @@ class Appointment(Base):
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor", back_populates="appointments")
     
-    # Randevu tamamlandığında ona bağlı bir muayene (examination) oluşturulur.
+    # Muayene ile ilişki
     examination = relationship("Examination", back_populates="appointment", uselist=False)
 
 class Examination(Base):
     """
-    Doktorun randevu sonrasında hastaya koyduğu tanı, verdiği tedavi ve reçete gibi
-    muayene kayıtlarını içeren tıbbi döküman tablosudur.
+    Muayene bittikten sonra doktorun yazdığı rapor, tanı, ilaçlar vs.
     """
     __tablename__ = "examinations"
 
     id = Column(Integer, primary_key=True, index=True)
     appointment_id = Column(Integer, ForeignKey("appointments.id"), unique=True, nullable=False)
-    diagnosis = Column(Text, nullable=True)      # Doktorun koyduğu teşhis
-    treatment = Column(Text, nullable=True)      # Önerilen veya uygulanan tedavi
-    prescription = Column(Text, nullable=True)   # Yazılan ilaçlar
-    medical_report = Column(Text, nullable=True) # Varsa hastaya verilen işgöremezlik vb. rapor
-    is_referred = Column(Boolean, default=False) # Hastanın başka bir kuruma sevk edilip edilmediği
+    diagnosis = Column(Text, nullable=True)      # Teşhis
+    treatment = Column(Text, nullable=True)      # Tedavi yöntemi
+    prescription = Column(Text, nullable=True)   # İlaçlar / Reçete
+    medical_report = Column(Text, nullable=True) # Rapor (istirahat vb.)
+    is_referred = Column(Boolean, default=False) # Başka yere sevk edilme durumu
 
     appointment = relationship("Appointment", back_populates="examination")
-    # Muayene bittiğinde vezneye yansıyacak olan ödeme
+    # Ödeme tablosuyla ilişki
     payment = relationship("Payment", back_populates="examination", uselist=False)
 
 class Payment(Base):
     """
-    Vezne (Cashier) modülü için fatura ve tahsilat kayıtlarını içerir.
-    Simüle edilen sigorta servisinden dönen tutarlar burada saklanır ve ödenir.
+    Fatura ve ödeme bilgileri
     """
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
     examination_id = Column(Integer, ForeignKey("examinations.id"), unique=True, nullable=False)
-    base_amount = Column(Float, nullable=False)        # İşlemin indirimsiz tam tutarı
-    discount_amount = Column(Float, default=0.0)       # Sigortanın vb. karşıladığı indirim tutarı
-    final_amount = Column(Float, nullable=False)       # Hastanın vezneye ödemesi gereken net tutar
+    base_amount = Column(Float, nullable=False)        # İndirimsiz normal ücret
+    discount_amount = Column(Float, default=0.0)       # Sigorta indirimi
+    final_amount = Column(Float, nullable=False)       # Ödenecek net ücret
     payment_method = Column(Enum(PaymentMethod), nullable=True)
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.BEKLIYOR)
 

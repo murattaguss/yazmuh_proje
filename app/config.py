@@ -1,16 +1,15 @@
 """
-Yapılandırma (Configuration) Modülü
-Projenin çevresel (environment) değişkenlerini yönettiğimiz kısımdır.
-pydantic_settings kullanılarak tip güvenli (type-safe) bir konfigürasyon sağlanmıştır.
+Ayarlar dosyası.
+.env dosyasındaki değişkenleri okumak için.
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    # Veritabanı bağlantı dizesi .env dosyasından okunacaktır.
+    # Veritabanı adresi (.env'den okunacak)
     DATABASE_URL: str
     
-    # .env dosyasının okunması için Pydantic V2 uyumlu ayarlar
+    # .env dosyasını okumak için gereken ayar
     model_config = SettingsConfigDict(env_file=".env")
 
-# Tüm uygulamada kullanılacak ayarlar nesnemizi oluşturuyoruz.
+# Ayarlar nesnesi
 settings = Settings()

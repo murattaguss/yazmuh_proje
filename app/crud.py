@@ -8,7 +8,7 @@ import secrets
 from fastapi import HTTPException
 
 async def create_clinic(db: AsyncSession, clinic: schemas.ClinicCreate):
-    """Yeni bir klinik oluşturur."""
+    """Klinik ekler"""
     db_clinic = models.Clinic(**clinic.model_dump())
     db.add(db_clinic)
     await db.commit()
@@ -16,7 +16,7 @@ async def create_clinic(db: AsyncSession, clinic: schemas.ClinicCreate):
     return db_clinic
 
 async def create_doctor(db: AsyncSession, doctor: schemas.DoctorCreate):
-    """Sisteme yeni bir doktor ekler ve ona otomatik bir kullanıcı hesabı açar."""
+    """Doktor ekleyip ona bir kullanıcı hesabı oluşturur"""
     result = await db.execute(select(models.Clinic).where(models.Clinic.id == doctor.clinic_id))
     clinic = result.scalar_one_or_none()
     if not clinic:
@@ -44,7 +44,7 @@ async def create_doctor(db: AsyncSession, doctor: schemas.DoctorCreate):
     return db_doctor
 
 async def create_patient(db: AsyncSession, patient: schemas.PatientCreate):
-    """Yeni bir hasta kaydı oluşturur. Eğer hasta daha önce eklenmişse hata döner."""
+    """Hasta ekler. Hasta zaten varsa hata verir."""
     result = await db.execute(select(models.Patient).where(models.Patient.tc_no == patient.tc_no))
     existing_patient = result.scalar_one_or_none()
     if existing_patient:
@@ -57,12 +57,12 @@ async def create_patient(db: AsyncSession, patient: schemas.PatientCreate):
     return db_patient
 
 async def get_patient_by_tc(db: AsyncSession, tc_no: str):
-    """TC kimlik numarasına göre hastayı veritabanında arar ve getirir."""
+    """TC'ye göre hastayı arar"""
     result = await db.execute(select(models.Patient).where(models.Patient.tc_no == tc_no))
     return result.scalar_one_or_none()
 
 async def check_availability(db: AsyncSession, doctor_id: int, date_req: datetime.date):
-    """Doktorun belirli bir gündeki çalışma saatlerini hesaplar ve alınmış randevuları çıkarıp boş saatleri bulur."""
+    """Doktorun seçilen gündeki boş saatlerini bulur"""
     result = await db.execute(select(models.Doctor).where(models.Doctor.id == doctor_id))
     doctor = result.scalar_one_or_none()
     if not doctor:
@@ -89,13 +89,41 @@ async def check_availability(db: AsyncSession, doctor_id: int, date_req: datetim
     return schemas.AvailabilityResponse(doctor_id=doctor_id, date=date_req, available_times=available_slots)
 
 async def create_appointment(db: AsyncSession, appointment: schemas.AppointmentCreate):
-    """Hastaya yeni randevu verir. Seçilen saatte doktor doluysa alternatif 3 saat önerisi sunar."""
+    """Randevu verir. Doluysa alternatif saat/tarih önerir"""
     result = await db.execute(select(models.Patient).where(models.Patient.tc_no == appointment.patient_tc))
     patient = result.scalar_one_or_none()
     if not patient:
          raise HTTPException(status_code=404, detail="Girdiğiniz TC Kimlik numarasına ait hasta bulunamadı. Lütfen önce hasta kaydını gerçekleştirin.")
     if not (datetime.time(9, 0) <= appointment.appointment_time <= datetime.time(16, 30)):
         raise HTTPException(status_code=400, detail="Randevu saatleri 09:00 ile 16:30 arasında olmalıdır.")
+
+    # 1. Geçmiş tarih kontrolü
+    today = datetime.date.today()
+    if appointment.appointment_date < today:
+        raise HTTPException(status_code=400, detail="Geçmiş bir tarihe randevu alınamaz.")
+
+    # 2. Hafta içi kontrolü
+    if appointment.appointment_date.weekday() >= 5:
+        raise HTTPException(status_code=400, detail="Poliklinik sadece hafta içi günlerde (Pazartesi-Cuma) hizmet vermektedir.")
+
+    # 3. Geçmiş saat kontrolü (Bugün için randevu alınıyorsa)
+    if appointment.appointment_date == today:
+        now_time = datetime.datetime.now().time()
+        if now_time > appointment.appointment_time:
+            raise HTTPException(status_code=400, detail="Bugün için seçilen randevu saati geçmiştir.")
+
+    # 4. Aynı gün, aynı doktordan birden fazla aktif randevu alınamaması kontrolü
+    stmt_check = select(models.Appointment).where(
+        and_(
+            models.Appointment.patient_id == patient.id,
+            models.Appointment.doctor_id == appointment.doctor_id,
+            models.Appointment.appointment_date == appointment.appointment_date,
+            models.Appointment.status == models.AppointmentStatus.AKTIF
+        )
+    )
+    res_check = await db.execute(stmt_check)
+    if res_check.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Hastanın bu doktordan aynı gün için zaten aktif bir randevusu bulunmaktadır.")
 
     stmt = select(models.Appointment).where(
         and_(
@@ -110,11 +138,24 @@ async def create_appointment(db: AsyncSession, appointment: schemas.AppointmentC
     
     if existing_appt:
         avail = await check_availability(db, appointment.doctor_id, appointment.appointment_date)
+        alt_dates = []
+        search_date = appointment.appointment_date + datetime.timedelta(days=1)
+        for _ in range(7):  # sonraki 7 güne bak
+            if len(alt_dates) >= 3:
+                break
+            if search_date.weekday() >= 5:  # Hafta sonunu geç
+                search_date += datetime.timedelta(days=1)
+                continue
+            day_avail = await check_availability(db, appointment.doctor_id, search_date)
+            if day_avail.available_times:
+                alt_dates.append(search_date.strftime("%Y-%m-%d"))
+            search_date += datetime.timedelta(days=1)
         raise HTTPException(
             status_code=409, 
             detail={
                 "message": "Seçilen saatte doktorun başka bir randevusu bulunmaktadır.",
-                "alternatives": [t.strftime("%H:%M") for t in avail.available_times[:3]]
+                "alternatives": [t.strftime("%H:%M") for t in avail.available_times[:3]],
+                "alternative_dates": alt_dates
             }
         )
 
@@ -130,7 +171,7 @@ async def create_appointment(db: AsyncSession, appointment: schemas.AppointmentC
     return db_appointment
 
 async def get_all_doctors(db: AsyncSession):
-    """Sistemdeki tüm doktorları, çalıştıkları klinik bilgisiyle birlikte liste halinde getirir."""
+    """Tüm doktorları kliniğiyle beraber getirir"""
     stmt = select(models.Doctor).options(selectinload(models.Doctor.clinic))
     result = await db.execute(stmt)
     doctors = result.scalars().all()
@@ -149,14 +190,10 @@ async def get_all_doctors(db: AsyncSession):
         for d in doctors
     ]
 
-async def get_all_users(db: AsyncSession):
-    stmt = select(models.User)
-    result = await db.execute(stmt)
-    users = result.scalars().all()
-    return users
+
 
 async def get_doctor_appointments(db: AsyncSession, doctor_id: int, date_req: datetime.date):
-    """Belirli bir doktorun belirli bir gündeki (varsayılan bugün) tüm aktif randevularını getirir."""
+    """Doktorun bir gündeki randevularını getirir"""
     stmt = select(models.Appointment).where(
         and_(
             models.Appointment.doctor_id == doctor_id,
@@ -168,7 +205,7 @@ async def get_doctor_appointments(db: AsyncSession, doctor_id: int, date_req: da
     return result.scalars().all()
 
 async def get_patient_history(db: AsyncSession, tc_no: str):
-    """Hastanın daha önce girdiği tüm muayeneleri kronolojik olarak sondan başa doğru getirir."""
+    """Hastanın geçmiş muayenelerini sondan başa getirir"""
     result = await db.execute(select(models.Patient).where(models.Patient.tc_no == tc_no))
     patient = result.scalar_one_or_none()
     if not patient:
@@ -182,7 +219,7 @@ async def get_patient_history(db: AsyncSession, tc_no: str):
     return schemas.PatientHistoryResponse(patient=patient, examinations=examinations)
 
 async def create_examination(db: AsyncSession, examination: schemas.ExaminationCreate):
-    """Doktorun gerçekleştirdiği muayeneyi kaydeder ve ilgili randevuyu Tamamlandı olarak işaretler."""
+    """Muayeneyi kaydeder ve randevuyu tamamlandı yapar"""
     patient_result = await db.execute(select(models.Patient).where(models.Patient.tc_no == examination.patient_tc))
     patient = patient_result.scalar_one_or_none()
     if not patient:
@@ -207,6 +244,7 @@ async def create_examination(db: AsyncSession, examination: schemas.ExaminationC
         diagnosis=examination.diagnosis,
         treatment=examination.treatment,
         prescription=examination.prescription,
+        medical_report=examination.medical_report,
         is_referred=examination.is_referred
     )
     db.add(db_examination)
@@ -217,7 +255,7 @@ async def create_examination(db: AsyncSession, examination: schemas.ExaminationC
     return db_examination
 
 def determine_insurance(tc_no: str, birth_date: datetime.date) -> dict:
-    """Hastanın yaşına ve TC nosuna göre basit bir dış sigorta simülasyonu yapar."""
+    """Hastanın yaşına ve TC'sine göre sigorta indirimi hesaplar"""
     today = datetime.date.today()
     age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
     
@@ -241,7 +279,7 @@ def determine_insurance(tc_no: str, birth_date: datetime.date) -> dict:
         return {"type": "Sigortasız", "coverage": 0}
 
 async def calculate_billing(db: AsyncSession, tc_no: str):
-    """Muayenesi biten hastanın vezneye yansıyacak olan net borcunu dış sigorta simülasyonunu kullanarak hesaplar."""
+    """Hastanın ödeyeceği borcu sigortaya göre hesaplar"""
     stmt = select(models.Examination, models.Patient).join(
         models.Appointment, models.Appointment.id == models.Examination.appointment_id
     ).join(
@@ -296,7 +334,7 @@ async def calculate_billing(db: AsyncSession, tc_no: str):
     )
 
 async def process_payment(db: AsyncSession, payment_data: schemas.PaymentCreate):
-    """Veznedarın hastadan aldığı ödemeyi sisteme nakit veya kredi kartı olarak işler."""
+    """Ödemeyi sisteme kaydeder (nakit/kart)"""
     stmt = select(models.Examination).join(
         models.Appointment
     ).join(
@@ -304,7 +342,7 @@ async def process_payment(db: AsyncSession, payment_data: schemas.PaymentCreate)
     ).where(models.Patient.tc_no == payment_data.patient_tc).order_by(models.Examination.id.desc())
     
     result = await db.execute(stmt)
-    examination = result.scalar_first()
+    examination = result.scalars().first()
     
     if not examination:
         raise HTTPException(status_code=404, detail="Bu TC numarasına ait muayene bulunamadı.")
@@ -342,7 +380,7 @@ async def create_user(db: AsyncSession, user: schemas.UserCreate):
     return db_user
 
 async def cancel_appointment(db: AsyncSession, appointment_id: int):
-    """Hastanın seçilen randevusunu iptal eder."""
+    """Randevuyu iptal eder"""
     result = await db.execute(select(models.Appointment).where(models.Appointment.id == appointment_id))
     appointment = result.scalar_one_or_none()
     if not appointment:
@@ -358,7 +396,7 @@ async def cancel_appointment(db: AsyncSession, appointment_id: int):
     return appointment
 
 async def reschedule_appointment(db: AsyncSession, appointment_id: int, reschedule_data: schemas.AppointmentReschedule):
-    """Hastanın seçilen randevusunun tarih ve saatini güncelleyerek yeniden planlar."""
+    """Randevuyu erteler veya saatini değiştirir"""
     result = await db.execute(select(models.Appointment).where(models.Appointment.id == appointment_id))
     appointment = result.scalar_one_or_none()
     if not appointment:
@@ -368,6 +406,36 @@ async def reschedule_appointment(db: AsyncSession, appointment_id: int, reschedu
     
     if not (datetime.time(9, 0) <= reschedule_data.new_time <= datetime.time(16, 30)):
         raise HTTPException(status_code=400, detail="Randevu saatleri 09:00 ile 16:30 arasında olmalıdır.")
+
+    # 1. Geçmiş tarih kontrolü
+    today = datetime.date.today()
+    if reschedule_data.new_date < today:
+        raise HTTPException(status_code=400, detail="Geçmiş bir tarihe randevu ertelenemez.")
+
+    # 2. Hafta içi kontrolü
+    if reschedule_data.new_date.weekday() >= 5:
+        raise HTTPException(status_code=400, detail="Poliklinik sadece hafta içi günlerde (Pazartesi-Cuma) hizmet vermektedir.")
+
+    # 3. Geçmiş saat kontrolü (Bugün için randevu erteleniyorsa)
+    if reschedule_data.new_date == today:
+        now_time = datetime.datetime.now().time()
+        if now_time > reschedule_data.new_time:
+            raise HTTPException(status_code=400, detail="Bugün için seçilen erteleme saati geçmiştir.")
+
+    # 4. Aynı gün, aynı doktordan birden fazla aktif randevu alınamaması kontrolü (kendi randevusu hariç)
+    stmt_check = select(models.Appointment).where(
+        and_(
+            models.Appointment.patient_id == appointment.patient_id,
+            models.Appointment.doctor_id == appointment.doctor_id,
+            models.Appointment.appointment_date == reschedule_data.new_date,
+            models.Appointment.status == models.AppointmentStatus.AKTIF,
+            models.Appointment.id != appointment.id
+        )
+    )
+    res_check = await db.execute(stmt_check)
+    if res_check.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Hastanın bu doktordan aynı gün için zaten aktif bir başka randevusu bulunmaktadır.")
+
     stmt = select(models.Appointment).where(
         and_(
             models.Appointment.doctor_id == appointment.doctor_id,
@@ -379,11 +447,24 @@ async def reschedule_appointment(db: AsyncSession, appointment_id: int, reschedu
     conflict_result = await db.execute(stmt)
     if conflict_result.scalar_one_or_none():
         avail = await check_availability(db, appointment.doctor_id, reschedule_data.new_date)
+        alt_dates = []
+        search_date = reschedule_data.new_date + datetime.timedelta(days=1)
+        for _ in range(7):  # sonraki 7 güne bak
+            if len(alt_dates) >= 3:
+                break
+            if search_date.weekday() >= 5:  # Hafta sonunu geç
+                search_date += datetime.timedelta(days=1)
+                continue
+            day_avail = await check_availability(db, appointment.doctor_id, search_date)
+            if day_avail.available_times:
+                alt_dates.append(search_date.strftime("%Y-%m-%d"))
+            search_date += datetime.timedelta(days=1)
         raise HTTPException(
             status_code=409,
             detail={
                 "message": "Yeni seçilen saatte doktorun başka bir randevusu var.",
-                "alternatives": [t.strftime("%H:%M") for t in avail.available_times[:5]]
+                "alternatives": [t.strftime("%H:%M") for t in avail.available_times[:5]],
+                "alternative_dates": alt_dates
             }
         )
     appointment.appointment_date = reschedule_data.new_date
@@ -393,7 +474,7 @@ async def reschedule_appointment(db: AsyncSession, appointment_id: int, reschedu
     return appointment
 
 async def search_appointments_by_tc(db: AsyncSession, tc_no: str):
-    """TC Kimlik numarası üzerinden hastanın tüm iptal edilmemiş randevularını arar."""
+    """Hastanın iptal edilmemiş randevularını TC ile arar"""
     patient_result = await db.execute(select(models.Patient).where(models.Patient.tc_no == tc_no))
     patient = patient_result.scalar_one_or_none()
     if not patient:
@@ -423,7 +504,7 @@ async def search_appointments_by_tc(db: AsyncSession, tc_no: str):
     ]
 
 async def get_my_appointments(db: AsyncSession, doctor_id: int, date_req: datetime.date):
-    """Doktorun kendi paneline girdiğinde gördüğü ekran için günlük hasta listesini getirir."""
+    """Doktorun o günkü hasta listesini getirir"""
     doc_result = await db.execute(
         select(models.Doctor).options(selectinload(models.Doctor.clinic)).where(models.Doctor.id == doctor_id)
     )
@@ -461,12 +542,12 @@ async def get_my_appointments(db: AsyncSession, doctor_id: int, date_req: dateti
 
 
 async def get_all_clinics(db: AsyncSession):
-    """Sistemde kayıtlı olan tüm klinikleri getirir."""
+    """Bütün klinikleri getirir"""
     result = await db.execute(select(models.Clinic))
     return result.scalars().all()
 
 async def get_report(db: AsyncSession, tc_no: str):
-    """Hastanın TC numarası ile en son olduğu muayenenin raporunu e-Nabız tarzı gösterim için getirir."""
+    """Hastanın son muayene raporunu getirir"""
     stmt = select(
         models.Examination, models.Appointment, models.Patient, models.Doctor, models.Clinic
     ).join(
@@ -502,7 +583,7 @@ async def get_report(db: AsyncSession, tc_no: str):
     )
 
 async def get_referral(db: AsyncSession, tc_no: str):
-    """Hastanın son muayenesinde sevk kararı varsa sevk evrakını oluşturur."""
+    """Hastanın son muayenesinde sevk varsa sevk belgesi hazırlar"""
     stmt = select(
         models.Examination, models.Appointment, models.Patient, models.Doctor, models.Clinic
     ).join(
@@ -538,7 +619,7 @@ async def get_referral(db: AsyncSession, tc_no: str):
     )
 
 async def get_transactions(db: AsyncSession, tc_no: str = None, status_filter: str = None):
-    """Veznedarın sistemden tüm geçmiş fatura/ödeme işlemlerini görüntülemesini sağlar."""
+    """Geçmiş tüm fatura ve ödemeleri listeler"""
     stmt = select(
         models.Payment, models.Examination, models.Appointment, models.Patient
     ).join(

@@ -1,24 +1,21 @@
 """
-Şemalar (Schemas) Modülü
-Bu modül Pydantic kullanılarak, verilerin frontend ve backend arasındaki 
-iletişiminde kullanılacak olan "Data Transfer Objects" (DTO) sınıflarını tanımlar.
-Bu sayede API'mize gelen istekler (request) ve dönen yanıtlar (response) tipleri 
-kontrol edilerek (validation) güvenli bir şekilde işlenir.
+API şemalarımız.
+Frontend ile veri alışverişi yaparken tipleri kontrol etmek için Pydantic şemaları.
 """
 from pydantic import BaseModel, constr, validator
 from datetime import date, time
 from typing import Optional, List
 from app.models import AppointmentStatus, PaymentMethod, PaymentStatus, UserRole
 
-# --- Kimlik Doğrulama Şemaları ---
+# Giriş/Token Şemaları
 class Token(BaseModel):
-    """Giriş yapan kullanıcıya döndürülecek token yapısı."""
+    """Kullanıcıya dönecek token bilgisi"""
     access_token: str
     token_type: str
     role: str
 
 class TokenData(BaseModel):
-    """Token içerisindeki taşınan veri."""
+    """Token içindeki veri"""
     username: Optional[str] = None
 
 class UserResponse(BaseModel):
@@ -30,53 +27,55 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Klinik Şemaları ---
+# Klinik Şemaları
 class ClinicBase(BaseModel):
-    """Klinik ortak özelliklerini barındırır."""
+    """Klinik genel bilgileri"""
     name: str
 
 class ClinicCreate(ClinicBase):
-    """Yeni klinik eklerken beklenen veriler."""
+    """Yeni klinik oluşturma şeması"""
     pass
 
 class ClinicResponse(ClinicBase):
-    """Klinik bilgileri çekilirken dönülecek veri yapısı."""
+    """Klinik yanıt şeması"""
     id: int
     is_active: bool
 
     class Config:
         from_attributes = True
 
-# --- Doktor Şemaları ---
+# Doktor Şemaları
 class DoctorBase(BaseModel):
-    """Doktorun ortak kişisel ve mesleki bilgileri."""
+    """Doktor genel bilgileri"""
     first_name: str
     last_name: str
-    tc_no: constr(min_length=11, max_length=11)
+    tc_no: str
     birth_date: date
     phone_number: str
     session_duration: Optional[int] = 30
 
 class DoctorCreate(DoctorBase):
-    """Sisteme (Admin paneli üzerinden) doktor eklerken kullanılan alanlar."""
+    """Doktor ekleme şeması"""
+    tc_no: constr(min_length=11, max_length=11, pattern=r'^\d{11}$')
+    phone_number: constr(min_length=10, max_length=10, pattern=r'^\d{10}$')
     clinic_id: int
 
 class DoctorResponse(DoctorBase):
-    """Doktor eklendikten sonra veya bilgileri çekildiğinde dönülen yanıt."""
+    """Doktor yanıt şeması"""
     id: int
     clinic_id: int
-    generated_password: Optional[str] = None # Sadece doktor ilk eklendiğinde gösterilen tek kullanımlık açık şifre
+    generated_password: Optional[str] = None # İlk eklendiğindeki geçici şifre
 
     class Config:
         from_attributes = True
 
 class DoctorListResponse(DoctorResponse):
-    """Listelemelerde ekstra olarak kliniğin adı da döndürülür."""
+    """Doktor listelerken kliniği de gösterir"""
     clinic_name: Optional[str] = None
 
-# --- Hasta Şemaları ---
+# Hasta Şemaları
 class PatientBase(BaseModel):
-    """Hasta demografik bilgileri ve tıbbi verileri."""
+    """Hasta genel bilgileri"""
     tc_no: constr(min_length=11, max_length=11)
     first_name: str
     last_name: str
@@ -88,31 +87,31 @@ class PatientBase(BaseModel):
     blood_type: Optional[str] = None
 
 class PatientCreate(PatientBase):
-    """Yeni hasta kaydı yapılırken kullanılan alanlar."""
+    """Hasta ekleme şeması"""
     pass
 
 class PatientResponse(PatientBase):
-    """Sorgulama sonucunda hastaya ait dönülen bilgiler."""
+    """Hasta yanıt şeması"""
     id: int
     created_at: date
 
     class Config:
         from_attributes = True
 
-# --- Randevu Şemaları ---
+# Randevu Şemaları
 class AppointmentBase(BaseModel):
-    """Randevunun temel zaman parametreleri."""
+    """Randevu zamanı"""
     appointment_date: date
     appointment_time: time
 
 class AppointmentCreate(AppointmentBase):
-    """Rezervasyon görevlisi veya hasta tarafından alınan randevuda beklenen veriler."""
-    patient_tc: str # TC numarası ile hastayı buluyoruz
-    clinic_id: int  # Randevu alınacak klinik
-    doctor_id: Optional[int] = None # Belirli bir doktor seçilmişse
+    """Randevu ekleme şeması"""
+    patient_tc: str # Hasta TC numarası
+    clinic_id: Optional[int] = None  # Hangi klinik
+    doctor_id: Optional[int] = None # Varsa doktor
 
 class AppointmentResponse(AppointmentBase):
-    """Randevu bilgilerini içeren geri dönüş formatı."""
+    """Randevu yanıt şeması"""
     id: int
     patient_id: int
     doctor_id: int
@@ -125,13 +124,13 @@ class AppointmentResponse(AppointmentBase):
         from_attributes = True
 
 class AvailabilityResponse(BaseModel):
-    """Doktorun belirli bir gündeki uygun saatlerini döndürür."""
+    """Doktorun boş saatleri"""
     doctor_id: int
     date: date
     available_times: List[time]
 
 class AppointmentSearchResponse(BaseModel):
-    """Randevu arama sonucunda döndürülen veri."""
+    """Randevu arama sonucu"""
     id: int
     patient_tc: str
     patient_name: str
@@ -141,9 +140,9 @@ class AppointmentSearchResponse(BaseModel):
     appointment_time: time
     status: AppointmentStatus
 
-# --- Muayene Şemaları ---
+# Muayene Şemaları
 class ExaminationCreate(BaseModel):
-    """Doktor panelinden muayene bitirildiğinde girilen tıbbi kayıtlar."""
+    """Muayene ekleme şeması"""
     patient_tc: str
     diagnosis: Optional[str] = None
     treatment: Optional[str] = None
@@ -152,7 +151,7 @@ class ExaminationCreate(BaseModel):
     is_referred: bool = False
 
 class ExaminationResponse(BaseModel):
-    """Eklenen muayene sonucunun çıktısı."""
+    """Muayene yanıt şeması"""
     id: int
     appointment_id: int
     diagnosis: Optional[str] = None
@@ -163,14 +162,14 @@ class ExaminationResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Ödeme / Vezne Şemaları ---
+# Ödeme ve Vezne Şemaları
 class PaymentCreate(BaseModel):
-    """Vezne tarafından tahsilat yapıldığında girilen bilgiler."""
-    examination_id: int
+    """Ödeme oluşturma şeması"""
+    patient_tc: constr(min_length=11, max_length=11)
     payment_method: PaymentMethod
 
 class PaymentResponse(BaseModel):
-    """Tahsilat sonrası dönülen makbuz/fatura bilgileri."""
+    """Ödeme yanıt şeması"""
     id: int
     examination_id: int
     base_amount: float
@@ -182,25 +181,25 @@ class PaymentResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Randevu Yönetim Şemaları ---
+# Randevu İşlemleri
 class AppointmentCancel(BaseModel):
-    """Randevu iptali için kullanılan şema."""
+    """Randevu iptal etme şeması"""
     tc_no: str
 
 class AppointmentReschedule(BaseModel):
-    """Randevu erteleme / yeni tarihe alma işleminde kullanılan alanlar."""
+    """Randevu erteleme şeması"""
     tc_no: str
     new_date: date
     new_time: time
 
 class PatientHistoryResponse(BaseModel):
-    """Hastanın geçmiş tıbbi verileriyle beraber döndürüldüğü kapsamlı sorgu yanıtı."""
+    """Hastanın geçmiş muayeneleri"""
     patient: PatientResponse
     examinations: List[ExaminationResponse]
 
-# --- Doktor Günlük Görünüm Şemaları ---
+# Doktor Ekranı Şemaları
 class DoctorAppointmentDetail(BaseModel):
-    """Doktor ekranında günlük randevu listesinde görünen kısa randevu detayı."""
+    """Doktorun göreceği randevu detayı"""
     appointment_id: int
     patient_tc: str
     patient_name: str
@@ -209,14 +208,14 @@ class DoctorAppointmentDetail(BaseModel):
     status: AppointmentStatus
 
 class DoctorDailyResponse(BaseModel):
-    """Doktorun o güne ait randevularını toplu olarak döndüren yapı."""
+    """Doktorun o günkü randevuları"""
     doctor_name: str
     date: date
     appointments: List[DoctorAppointmentDetail]
 
-# --- Rapor ve Sevk Şemaları ---
+# Rapor ve Sevk Şemaları
 class ReportResponse(BaseModel):
-    """Hastaya e-Nabız tarzı verilebilecek detaylı muayene raporu çıktısı."""
+    """Muayene raporu şeması"""
     examination_id: int
     patient_tc: str
     patient_name: str
@@ -231,7 +230,7 @@ class ReportResponse(BaseModel):
     is_referred: bool = False
 
 class ReferralResponse(BaseModel):
-    """Başka hastaneye / kuruma sevk durumunda hazırlanan sevk belgesi."""
+    """Sevk belgesi şeması"""
     examination_id: int
     patient_tc: str
     patient_name: str
@@ -242,20 +241,19 @@ class ReferralResponse(BaseModel):
     diagnosis: Optional[str] = None
     notes: Optional[str] = None
 
-# --- Diğer Şemalar ---
+# Fatura ve İşlemler
 class BillingResponse(BaseModel):
-    """Muayenesi biten hastanın veznede görünen borç dökümü (Dış sigorta simüle edilmiş hali)."""
+    """Fatura dökümü şeması"""
     examination_id: int
     patient_tc: str
-    patient_name: str
-    clinic_name: str
+    insurance_type: str
     base_amount: float
+    discount_percentage: int
     discount_amount: float
     final_amount: float
-    payment_status: PaymentStatus
 
 class TransactionResponse(BaseModel):
-    """Veznedarın sistemden tüm geçmiş fatura/ödeme işlemlerini görüntülemesi."""
+    """Geçmiş ödemeler listesi"""
     payment_id: int
     examination_id: int
     patient_tc: str

@@ -1,30 +1,29 @@
 """
-Veritabanı Bağlantı ve Oturum Yönetimi
-Bu modül uygulamanın veritabanı (SQLite) ile asenkron iletişimini sağlar.
-SQLAlchemy'nin asenkron özellikleri kullanılarak yüksek performanslı bir yapı hedeflenmiştir.
+Veritabanı bağlantısı.
+SQLite ile asenkron çalışmak için bu modülü kullanıyoruz.
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from app.config import settings
 
-# Veritabanı motorunu oluşturuyoruz. 'echo=True' ile SQL sorgularını loglarda görebiliriz.
+# Veritabanı motorunu oluşturduk, echo=True ile SQL sorgularını terminalde görebiliyoruz
 engine = create_async_engine(settings.DATABASE_URL, echo=True)
 
-# Asenkron veritabanı oturumlarını (session) yönetecek fabrika (factory) nesnesi.
-# expire_on_commit=False, nesnelerin commit sonrası hemen veritabanından kopmamasını sağlar.
+# Oturum (session) oluşturucu nesne
+# expire_on_commit=False ile commit sonrasında nesnelerin veritabanından kopmasını önlüyoruz
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False
 )
 
-# Tüm veritabanı modellerimizin (tabloların) miras alacağı temel sınıfımız
+# Modellerimizin miras alacağı ana sınıf
 Base = declarative_base()
 
 async def get_db():
     """
-    FastAPI dependency injection (bağımlılık enjeksiyonu) için veritabanı oturumu sağlar.
-    Her istek (request) için yeni bir session açılır ve işlem bitince güvenle kapatılır.
+    FastAPI db bağlantısı için db oturumu açar.
+    İşlem bitince otomatik kapanır.
     """
     async with AsyncSessionLocal() as session:
         yield session
