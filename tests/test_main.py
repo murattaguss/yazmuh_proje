@@ -601,28 +601,28 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.session.add(p)
         await self.session.commit()
 
-        # 3. İki farklı doktora randevu oluştur
-        date = get_next_weekday()
-        # Doktor 1 için randevu
+        # 3. İki FARKLI doktora BUGÜN için randevu oluştur
+        today = datetime.date.today()
+        # Doktor 1 için bugünün randevusu
         appt1 = models.Appointment(
             patient_id=p.id,
             doctor_id=1,
-            appointment_date=date,
+            appointment_date=today,
             appointment_time=datetime.time(10, 0),
             status=models.AppointmentStatus.AKTIF
         )
-        # Doktor 2 için randevu
+        # Doktor 2 için bugünün randevusu
         appt2 = models.Appointment(
             patient_id=p.id,
             doctor_id=doc2.id,
-            appointment_date=date,
+            appointment_date=today,
             appointment_time=datetime.time(14, 0),
             status=models.AppointmentStatus.AKTIF
         )
         self.session.add_all([appt1, appt2])
         await self.session.commit()
 
-        # 4. Doktor 1 muayene kaydetmeye çalışsın
+        # 4. Doktor 1 muayene kaydetmeye çalışsın (hata almadan başarılı olmalı)
         exam_data = schemas.ExaminationCreate(
             patient_tc=p.tc_no,
             diagnosis="Miyopi",
@@ -632,7 +632,6 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
             is_referred=False
         )
         
-        # doctor_id=1 olarak gönderiyoruz. Bu durumda hata almadan başarılı olmalı.
         db_exam = await crud.create_examination(self.session, exam_data, doctor_id=1)
         self.assertIsNotNone(db_exam.id)
         
@@ -640,9 +639,60 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         await self.session.refresh(appt1)
         self.assertEqual(appt1.status, models.AppointmentStatus.TAMAMLANDI)
         
-        # Doktor 2'in randevusu hâlâ AKTIF kalmalı
+        # Doktor 2'nin randevusu hâlâ AKTIF kalmalı
         await self.session.refresh(appt2)
         self.assertEqual(appt2.status, models.AppointmentStatus.AKTIF)
+
+    # TEST 20: Aynı doktora bugün ve ilerleyen tarihe randevusu olan hastanın muayene edilebilmesi testi
+    async def test_create_examination_same_doctor_today_and_future_appointment(self):
+        # Hasta oluştur
+        p = models.Patient(tc_no="98765432166", first_name="Selin", last_name="Demir", birth_date=datetime.date(1993, 1, 1))
+        self.session.add(p)
+        await self.session.commit()
+
+        today = datetime.date.today()
+        future_date = get_next_weekday(today + datetime.timedelta(days=2))
+
+        # Bugünkü randevu (muayene edilecek olan)
+        appt_today = models.Appointment(
+            patient_id=p.id,
+            doctor_id=1,
+            appointment_date=today,
+            appointment_time=datetime.time(10, 0),
+            status=models.AppointmentStatus.AKTIF
+        )
+        # 3 gün sonraki randevu (gelecekte, muayeneyi engellememeli)
+        appt_future = models.Appointment(
+            patient_id=p.id,
+            doctor_id=1,
+            appointment_date=future_date,
+            appointment_time=datetime.time(11, 0),
+            status=models.AppointmentStatus.AKTIF
+        )
+        self.session.add_all([appt_today, appt_future])
+        await self.session.commit()
+
+        # Doktor bugünkü muayeneyi kaydetmeye çalışsın
+        exam_data = schemas.ExaminationCreate(
+            patient_tc=p.tc_no,
+            diagnosis="Göz tansiyonu",
+            treatment="İlaç tedavisi",
+            prescription="Göz Damlası B",
+            medical_report="Yok",
+            is_referred=False
+        )
+
+        # Hata almadan başarılı olmalı
+        db_exam = await crud.create_examination(self.session, exam_data, doctor_id=1)
+        self.assertIsNotNone(db_exam.id)
+
+        # Bugünkü randevu TAMAMLANDI olmalı
+        await self.session.refresh(appt_today)
+        self.assertEqual(appt_today.status, models.AppointmentStatus.TAMAMLANDI)
+
+        # Gelecekteki randevu hâlâ AKTIF kalmalı
+        await self.session.refresh(appt_future)
+        self.assertEqual(appt_future.status, models.AppointmentStatus.AKTIF)
 
 if __name__ == "__main__":
     unittest.main()

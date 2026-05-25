@@ -225,13 +225,16 @@ async def create_examination(db: AsyncSession, examination: schemas.ExaminationC
     if not patient:
          raise HTTPException(status_code=404, detail="Bu TC numarasına ait hasta bulunamadı.")
     
-    # Aktif randevuları sorgula. Eğer muayene yapan doktorun ID'si varsa, sadece o doktorun randevularına bak.
+    # Aktif randevuları sorgula.
+    # Doktor ID'si varsa: sadece o doktorun BUGÜNKÜ aktif randevusunu al (gelecekteki randevular muayeneyi engellemesin).
+    # Doktor ID'si yoksa: tüm aktif randevulara bak.
     stmt_filters = [
         models.Appointment.patient_id == patient.id,
         models.Appointment.status == models.AppointmentStatus.AKTIF
     ]
     if doctor_id is not None:
         stmt_filters.append(models.Appointment.doctor_id == doctor_id)
+        stmt_filters.append(models.Appointment.appointment_date == datetime.date.today())
 
     stmt = select(models.Appointment).where(and_(*stmt_filters))
     result = await db.execute(stmt)
@@ -239,7 +242,7 @@ async def create_examination(db: AsyncSession, examination: schemas.ExaminationC
     
     if not active_appointments:
         if doctor_id is not None:
-            raise HTTPException(status_code=404, detail="Bu hastanın bu doktorda aktif bir randevusu bulunamadı.")
+            raise HTTPException(status_code=404, detail="Bu hastanın bugün için bu doktorda aktif bir randevusu bulunamadı.")
         else:
             raise HTTPException(status_code=404, detail="Bu hastanın aktif bir randevusu bulunamadı.")
             
