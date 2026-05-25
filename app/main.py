@@ -206,7 +206,7 @@ async def get_patient_history(tc_no: str, db: AsyncSession = Depends(get_db), cu
 @app.post("/doctor/examinations", response_model=schemas.ExaminationResponse, tags=["Doctor"])
 async def create_examination(examination: schemas.ExaminationCreate, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     """Muayene kaydını tamamlar"""
-    return await crud.create_examination(db=db, examination=examination)
+    return await crud.create_examination(db=db, examination=examination, doctor_id=current_user.doctor_id)
 
 @app.get("/doctor/report/{tc_no}", response_model=schemas.ReportResponse, tags=["Doctor"])
 async def get_report(tc_no: str, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):

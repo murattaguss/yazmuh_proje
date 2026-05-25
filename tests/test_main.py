@@ -580,5 +580,69 @@ class ClinicSystemTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("zaten aktif bir randevusu bulunmaktadır", context.exception.detail)
 
+    # TEST 19: Bir hasta farklı iki doktora aktif randevusu varken ilk doktorun muayene edebilmesi testi
+    async def test_create_examination_multiple_active_appointments_different_doctors(self):
+        # 1. İkinci bir doktor ekleyelim
+        doc2 = models.Doctor(
+            first_name="Mehmet",
+            last_name="Kaya",
+            tc_no="33333333334",
+            birth_date=datetime.date(1980, 1, 1),
+            phone_number="5553333334",
+            clinic_id=1,
+            session_duration=30
+        )
+        self.session.add(doc2)
+        await self.session.commit()
+        await self.session.refresh(doc2)
+        
+        # 2. Hasta oluştur
+        p = models.Patient(tc_no="98765432177", first_name="Elif", last_name="Yıldız", birth_date=datetime.date(1992, 1, 1))
+        self.session.add(p)
+        await self.session.commit()
+
+        # 3. İki farklı doktora randevu oluştur
+        date = get_next_weekday()
+        # Doktor 1 için randevu
+        appt1 = models.Appointment(
+            patient_id=p.id,
+            doctor_id=1,
+            appointment_date=date,
+            appointment_time=datetime.time(10, 0),
+            status=models.AppointmentStatus.AKTIF
+        )
+        # Doktor 2 için randevu
+        appt2 = models.Appointment(
+            patient_id=p.id,
+            doctor_id=doc2.id,
+            appointment_date=date,
+            appointment_time=datetime.time(14, 0),
+            status=models.AppointmentStatus.AKTIF
+        )
+        self.session.add_all([appt1, appt2])
+        await self.session.commit()
+
+        # 4. Doktor 1 muayene kaydetmeye çalışsın
+        exam_data = schemas.ExaminationCreate(
+            patient_tc=p.tc_no,
+            diagnosis="Miyopi",
+            treatment="Takip",
+            prescription="Yok",
+            medical_report="Yok",
+            is_referred=False
+        )
+        
+        # doctor_id=1 olarak gönderiyoruz. Bu durumda hata almadan başarılı olmalı.
+        db_exam = await crud.create_examination(self.session, exam_data, doctor_id=1)
+        self.assertIsNotNone(db_exam.id)
+        
+        # Doktor 1'in randevusu TAMAMLANDI olmalı
+        await self.session.refresh(appt1)
+        self.assertEqual(appt1.status, models.AppointmentStatus.TAMAMLANDI)
+        
+        # Doktor 2'in randevusu hâlâ AKTIF kalmalı
+        await self.session.refresh(appt2)
+        self.assertEqual(appt2.status, models.AppointmentStatus.AKTIF)
+
 if __name__ == "__main__":
     unittest.main()

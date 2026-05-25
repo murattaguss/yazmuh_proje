@@ -218,23 +218,31 @@ async def get_patient_history(db: AsyncSession, tc_no: str):
     
     return schemas.PatientHistoryResponse(patient=patient, examinations=examinations)
 
-async def create_examination(db: AsyncSession, examination: schemas.ExaminationCreate):
+async def create_examination(db: AsyncSession, examination: schemas.ExaminationCreate, doctor_id: int = None):
     """Muayeneyi kaydeder ve randevuyu tamamlandı yapar"""
     patient_result = await db.execute(select(models.Patient).where(models.Patient.tc_no == examination.patient_tc))
     patient = patient_result.scalar_one_or_none()
     if not patient:
          raise HTTPException(status_code=404, detail="Bu TC numarasına ait hasta bulunamadı.")
-    stmt = select(models.Appointment).where(
-        and_(
-            models.Appointment.patient_id == patient.id,
-            models.Appointment.status == models.AppointmentStatus.AKTIF
-        )
-    )
+    
+    # Aktif randevuları sorgula. Eğer muayene yapan doktorun ID'si varsa, sadece o doktorun randevularına bak.
+    stmt_filters = [
+        models.Appointment.patient_id == patient.id,
+        models.Appointment.status == models.AppointmentStatus.AKTIF
+    ]
+    if doctor_id is not None:
+        stmt_filters.append(models.Appointment.doctor_id == doctor_id)
+
+    stmt = select(models.Appointment).where(and_(*stmt_filters))
     result = await db.execute(stmt)
     active_appointments = result.scalars().all()
     
     if not active_appointments:
-        raise HTTPException(status_code=404, detail="Bu hastanın aktif bir randevusu bulunamadı.")
+        if doctor_id is not None:
+            raise HTTPException(status_code=404, detail="Bu hastanın bu doktorda aktif bir randevusu bulunamadı.")
+        else:
+            raise HTTPException(status_code=404, detail="Bu hastanın aktif bir randevusu bulunamadı.")
+            
     if len(active_appointments) > 1:
         raise HTTPException(status_code=400, detail="Hastanın birden fazla aktif randevusu var. Lütfen manuel kontrol edin.")
         
